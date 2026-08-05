@@ -168,26 +168,15 @@ async function sendMessage() {
   clearPendingImage();
 
   const loading = addMessage(
-    "🐺 Husky AI печатает<span id='dots'>.</span>",
+    "<div class='dogRunner'><span class='dog'>🐕</span></div>",
     "ai"
   );
 
   setThinking(true);
 
-  let dots = 1;
-
-  const timer = setInterval(() => {
-    const el = document.getElementById("dots");
-    if (!el) return;
-    dots++;
-    if (dots > 3) dots = 1;
-    el.textContent = ".".repeat(dots);
-  }, 350);
-
   try {
     const result = await askWithFallback(history);
 
-    clearInterval(timer);
     setThinking(false);
     loading.remove();
 
@@ -207,7 +196,6 @@ async function sendMessage() {
     scrollBottom();
 
   } catch (e) {
-    clearInterval(timer);
     setThinking(false);
     loading.remove();
     addMessage("❌ Ошибка подключения к нейросети.", "ai");
