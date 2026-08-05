@@ -43,20 +43,13 @@ pointer-events:none;
 }
 
 @keyframes bgMove{
-
-0%{
-transform:scale(1) translate(0,0);
-filter:blur(0px);
+0%{ transform:scale(1) translate(0,0); filter:blur(0px); }
+100%{ transform:scale(1.15) translate(-25px,-20px); filter:blur(6px); }
 }
 
-100%{
-transform:scale(1.15) translate(-25px,-20px);
-filter:blur(6px);
-}
-
-}
-
-/* Экран загрузки */
+/* =========================
+   ЭКРАН ЗАГРУЗКИ
+========================= */
 
 .boot{
 position:fixed;
@@ -67,12 +60,39 @@ justify-content:center;
 align-items:center;
 background:#000;
 z-index:999999;
+overflow:hidden;
+}
+
+.bootRing{
+position:absolute;
+width:260px;
+height:260px;
+border-radius:50%;
+border:1px solid rgba(255,0,0,.25);
+border-top:1px solid rgba(255,80,80,.9);
+animation:bootSpin 3s linear infinite;
+}
+
+.bootRing::before{
+content:"";
+position:absolute;
+inset:20px;
+border-radius:50%;
+border:1px solid rgba(255,0,0,.15);
+border-bottom:1px solid rgba(255,120,120,.8);
+animation:bootSpin 4.5s linear infinite reverse;
+}
+
+@keyframes bootSpin{
+0%{ transform:rotate(0deg); }
+100%{ transform:rotate(360deg); }
 }
 
 .bootLogo{
 width:140px;
 height:140px;
 object-fit:contain;
+border-radius:50%;
 filter:
 drop-shadow(0 0 18px red)
 drop-shadow(0 0 45px red);
@@ -80,16 +100,10 @@ animation:logoFloat 3s ease-in-out infinite;
 }
 
 @keyframes logoFloat{
-
-0%,100%{
-transform:translateY(0) scale(1);
+0%,100%{ transform:translateY(0) scale(1); }
+50%{ transform:translateY(-8px) scale(1.03); }
 }
 
-50%{
-transform:translateY(-8px) scale(1.03);
-}
-
-}
 .boot h1{
 margin-top:22px;
 font-size:38px;
@@ -107,9 +121,7 @@ font-size:18px;
 font-weight:700;
 letter-spacing:3px;
 color:#ff4444;
-text-shadow:
-0 0 8px red,
-0 0 20px red;
+text-shadow:0 0 8px red,0 0 20px red;
 animation:warning 1.8s ease-in-out infinite alternate;
 }
 
@@ -118,6 +130,7 @@ margin-top:12px;
 font-size:15px;
 color:#ff9999;
 letter-spacing:2px;
+min-height:20px;
 }
 
 .loader{
@@ -134,24 +147,26 @@ border:1px solid rgba(255,0,0,.25);
 width:0%;
 height:100%;
 background:linear-gradient(90deg,#700,#ff0000,#ff6666);
-box-shadow:
-0 0 10px red,
-0 0 25px red;
+box-shadow:0 0 10px red,0 0 25px red;
+transition:width .15s ease-out;
+}
+
+.bootPercent{
+margin-top:8px;
+font-size:13px;
+color:#ff6666;
+letter-spacing:2px;
+font-variant-numeric:tabular-nums;
 }
 
 @keyframes warning{
-
-0%{
-opacity:.45;
+0%{ opacity:.45; }
+100%{ opacity:1; }
 }
 
-100%{
-opacity:1;
-}
-
-}
-
-/* Основное окно */
+/* =========================
+   ОСНОВНОЕ ОКНО
+========================= */
 
 .app{
 max-width:900px;
@@ -170,7 +185,9 @@ padding:16px;
 text-align:center;
 background:linear-gradient(180deg,#250000,#120000);
 border-bottom:1px solid rgba(255,0,0,.18);
+perspective:600px;
 }
+
 /* ===== Логотип ===== */
 
 .logoBox{
@@ -178,15 +195,15 @@ position:relative;
 width:110px;
 height:110px;
 margin:0 auto 12px;
+transform-style:preserve-3d;
+transition:transform .5s ease;
 }
 
 .glow{
 position:absolute;
 inset:-18px;
 border-radius:50%;
-background:radial-gradient(circle,
-rgba(255,0,0,.55),
-transparent 72%);
+background:radial-gradient(circle,rgba(255,0,0,.55),transparent 72%);
 filter:blur(18px);
 animation:glowPulse 2.5s ease-in-out infinite;
 }
@@ -198,30 +215,48 @@ height:110px;
 object-fit:cover;
 border-radius:50%;
 border:2px solid rgba(255,60,60,.8);
-box-shadow:
-0 0 20px red,
-0 0 45px rgba(255,0,0,.45);
+box-shadow:0 0 20px red,0 0 45px rgba(255,0,0,.45);
 animation:logoBreath 3s ease-in-out infinite;
+transition:transform .4s cubic-bezier(.34,1.56,.64,1),box-shadow .4s ease;
 }
 
 @keyframes logoBreath{
-0%,100%{
-transform:scale(1);
-}
-50%{
-transform:scale(1.05);
-}
+0%,100%{ transform:scale(1); }
+50%{ transform:scale(1.05); }
 }
 
 @keyframes glowPulse{
-0%,100%{
-opacity:.45;
-transform:scale(1);
+0%,100%{ opacity:.45; transform:scale(1); }
+50%{ opacity:1; transform:scale(1.12); }
 }
-50%{
-opacity:1;
-transform:scale(1.12);
+
+/* Хаски "думает" — наклоняется к тебе, эффект 3D */
+
+body.thinking .logoBox{
+transform:translateZ(40px) scale(1.08);
 }
+
+body.thinking .logo{
+transform:translateZ(25px) rotateX(-6deg) scale(1.1);
+box-shadow:
+0 0 35px red,
+0 0 70px rgba(255,0,0,.65),
+0 10px 30px rgba(0,0,0,.6);
+animation:thinkTilt 1.1s ease-in-out infinite alternate;
+}
+
+@keyframes thinkTilt{
+0%{ transform:translateZ(25px) rotateX(-6deg) rotate(-1.5deg) scale(1.08); }
+100%{ transform:translateZ(30px) rotateX(-8deg) rotate(1.5deg) scale(1.12); }
+}
+
+body.thinking .eye{
+animation-duration:.55s;
+box-shadow:
+0 0 12px #ff0000,
+0 0 26px #ff0000,
+0 0 55px #ff0000,
+0 0 90px rgba(255,0,0,.9);
 }
 
 /* ===== Светящиеся глаза ===== */
@@ -250,33 +285,18 @@ box-shadow:
 animation:eyesPulse 1.5s ease-in-out infinite alternate;
 }
 
-.left{
-left:31px;
-top:43px;
-}
-
-.right{
-right:31px;
-top:43px;
-}
+.left{ left:31px; top:43px; }
+.right{ right:31px; top:43px; }
 
 @keyframes eyesPulse{
-0%{
-opacity:.45;
-transform:scale(.9);
-}
-100%{
-opacity:1;
-transform:scale(1.45);
-}
+0%{ opacity:.45; transform:scale(.9); }
+100%{ opacity:1; transform:scale(1.45); }
 }
 
 .header h1{
 font-size:28px;
 letter-spacing:2px;
-text-shadow:
-0 0 10px red,
-0 0 25px red;
+text-shadow:0 0 10px red,0 0 25px red;
 }
 
 .header p{
@@ -284,8 +304,9 @@ margin-top:6px;
 font-size:14px;
 color:#ff9a9a;
 }
+
 /* =========================
-   ЧАТ
+   ЧАТ — сообщения без "пузырей"
 ========================= */
 
 .messages{
@@ -294,58 +315,105 @@ overflow-y:auto;
 padding:20px;
 display:flex;
 flex-direction:column;
-gap:16px;
+gap:18px;
 scroll-behavior:smooth;
 }
 
-.messages::-webkit-scrollbar{
-width:6px;
-}
-
-.messages::-webkit-scrollbar-thumb{
-background:#700;
-border-radius:20px;
-}
+.messages::-webkit-scrollbar{ width:6px; }
+.messages::-webkit-scrollbar-thumb{ background:#700; border-radius:20px; }
 
 .message{
 max-width:82%;
-padding:15px 18px;
-border-radius:18px;
+padding:14px 18px;
+border-radius:14px;
 line-height:1.7;
 word-break:break-word;
-animation:messageShow .35s ease;
-backdrop-filter:blur(10px);
+background:rgba(20,10,10,.4);
+border:1px solid rgba(255,0,0,.15);
 }
 
-.ai{
-align-self:flex-start;
-background:linear-gradient(180deg,
-rgba(45,16,16,.95),
-rgba(22,8,8,.92));
-border:1px solid rgba(255,0,0,.18);
-box-shadow:
-0 0 18px rgba(255,0,0,.12);
+.message img.msgImg{
+max-width:100%;
+border-radius:10px;
+margin-top:8px;
+display:block;
+box-shadow:0 0 16px rgba(255,0,0,.35);
 }
 
-.user{
-align-self:flex-end;
-background:linear-gradient(180deg,#ff3535,#8a0000);
-box-shadow:
-0 0 20px rgba(255,0,0,.35);
+.ai{ align-self:flex-start; }
+.user{ align-self:flex-end; }
+
+/* Импульс "как круги на воде" при появлении сообщения */
+
+.message.impulse{
+animation:impulseIn .9s cubic-bezier(.2,.9,.3,1) forwards;
 }
 
-@keyframes messageShow{
-
+@keyframes impulseIn{
 0%{
 opacity:0;
-transform:translateY(20px) scale(.97);
+transform:scale(.55);
+box-shadow:0 0 0 rgba(255,0,0,0);
+border-color:rgba(255,0,0,0);
 }
-
+35%{
+opacity:1;
+transform:scale(1.12);
+box-shadow:
+0 0 30px rgba(255,40,40,.9),
+0 0 70px rgba(255,0,0,.55);
+border-color:rgba(255,90,90,.9);
+}
+70%{
+transform:scale(.97);
+}
 100%{
 opacity:1;
-transform:translateY(0) scale(1);
+transform:scale(1);
+box-shadow:0 0 14px rgba(255,0,0,.18);
+border-color:rgba(255,0,0,.18);
+}
 }
 
+.user.impulse{
+background:linear-gradient(180deg,rgba(255,53,53,.22),rgba(90,0,0,.35));
+}
+
+.ai.impulse{
+background:linear-gradient(180deg,rgba(45,16,16,.6),rgba(22,8,8,.55));
+}
+
+/* =========================
+   ПРЕВЬЮ КАРТИНКИ
+========================= */
+
+.imagePreview{
+display:flex;
+align-items:center;
+gap:10px;
+padding:10px 16px;
+background:rgba(15,15,15,.92);
+border-top:1px solid rgba(255,0,0,.12);
+}
+
+.imagePreview img{
+width:52px;
+height:52px;
+object-fit:cover;
+border-radius:10px;
+border:1px solid rgba(255,60,60,.6);
+box-shadow:0 0 12px rgba(255,0,0,.35);
+}
+
+.removeImage{
+width:26px;
+height:26px;
+border:none;
+border-radius:50%;
+background:#3a0000;
+color:#ff9999;
+cursor:pointer;
+font-size:14px;
 }
 
 /* =========================
@@ -354,14 +422,15 @@ transform:translateY(0) scale(1);
 
 .inputBox{
 display:flex;
-gap:12px;
+align-items:center;
+gap:10px;
 padding:16px;
 background:rgba(15,15,15,.92);
 border-top:1px solid rgba(255,0,0,.15);
 backdrop-filter:blur(14px);
 }
 
-input{
+input[type="text"]{
 flex:1;
 padding:15px 18px;
 border:none;
@@ -373,18 +442,44 @@ outline:none;
 transition:.25s;
 }
 
-input::placeholder{
-color:#888;
-}
+input::placeholder{ color:#888; }
 
-input:focus{
-box-shadow:
-0 0 20px rgba(255,0,0,.35);
+input[type="text"]:focus{
+box-shadow:0 0 20px rgba(255,0,0,.35);
 background:#222;
 }
 
-button{
-width:62px;
+.iconBtn{
+width:50px;
+height:50px;
+flex-shrink:0;
+border:none;
+border-radius:14px;
+cursor:pointer;
+font-size:20px;
+color:#fff;
+background:#1b1b1b;
+box-shadow:0 0 10px rgba(255,0,0,.15);
+transition:.25s;
+}
+
+.iconBtn:hover{ transform:scale(1.08); box-shadow:0 0 18px rgba(255,0,0,.35); }
+.iconBtn:active{ transform:scale(.94); }
+
+.iconBtn.recording{
+background:linear-gradient(180deg,#ff2b2b,#820000);
+animation:micPulse 1s ease-in-out infinite;
+}
+
+@keyframes micPulse{
+0%,100%{ box-shadow:0 0 14px rgba(255,0,0,.5); }
+50%{ box-shadow:0 0 34px rgba(255,0,0,.9); }
+}
+
+button#send{
+width:56px;
+height:50px;
+flex-shrink:0;
 border:none;
 border-radius:16px;
 cursor:pointer;
@@ -392,49 +487,30 @@ font-size:24px;
 color:white;
 background:linear-gradient(180deg,#ff2b2b,#820000);
 transition:.25s;
-box-shadow:
-0 0 18px rgba(255,0,0,.35);
+box-shadow:0 0 18px rgba(255,0,0,.35);
 }
 
-button:hover{
-transform:scale(1.08);
-box-shadow:
-0 0 28px red;
-}
+button#send:hover{ transform:scale(1.08); box-shadow:0 0 28px red; }
+button#send:active{ transform:scale(.95); }
 
-button:active{
-transform:scale(.95);
-}
 /* =========================
    ФИНАЛЬНЫЕ ЭФФЕКТЫ
 ========================= */
-
-/* Красная вспышка во время ответа */
 
 body.thinking::after{
 content:"";
 position:fixed;
 inset:0;
 pointer-events:none;
-box-shadow:
-inset 0 0 120px rgba(255,0,0,.28);
+box-shadow:inset 0 0 120px rgba(255,0,0,.28);
 animation:thinkingFlash .7s infinite alternate;
 z-index:999;
 }
 
 @keyframes thinkingFlash{
-
-0%{
-opacity:.25;
+0%{ opacity:.25; }
+100%{ opacity:1; }
 }
-
-100%{
-opacity:1;
-}
-
-}
-
-/* Улучшенный импульс */
 
 .ripple{
 position:fixed;
@@ -444,66 +520,36 @@ border-radius:50%;
 pointer-events:none;
 transform:translate(-50%,-50%);
 border:2px solid rgba(255,40,40,.9);
-box-shadow:
-0 0 12px red,
-0 0 28px red;
+box-shadow:0 0 12px red,0 0 28px red;
 animation:rippleWave .9s ease-out forwards;
 }
 
 @keyframes rippleWave{
-
-0%{
-opacity:1;
-transform:translate(-50%,-50%) scale(.2);
+0%{ opacity:1; transform:translate(-50%,-50%) scale(.2); }
+100%{ opacity:0; transform:translate(-50%,-50%) scale(25); }
 }
-
-100%{
-opacity:0;
-transform:translate(-50%,-50%) scale(25);
-}
-
-}
-
-/* Плавающее свечение логотипа */
 
 .logoBox::after{
 content:"";
 position:absolute;
 inset:-35px;
-background:radial-gradient(circle,
-rgba(255,0,0,.18),
-transparent 70%);
+background:radial-gradient(circle,rgba(255,0,0,.18),transparent 70%);
 filter:blur(24px);
 animation:halo 5s linear infinite;
 pointer-events:none;
 }
 
 @keyframes halo{
-
-0%{
-transform:rotate(0deg);
+0%{ transform:rotate(0deg); }
+100%{ transform:rotate(360deg); }
 }
 
-100%{
-transform:rotate(360deg);
-}
-
-}
-
-/* Небольшое свечение приложения */
-
-.app{
-box-shadow:
-0 0 45px rgba(255,0,0,.12);
-}
-
-/* Плавные переходы */
+.app{ box-shadow:0 0 45px rgba(255,0,0,.12); }
 
 *{
 transition:
 background .25s,
 color .25s,
 border-color .25s,
-box-shadow .25s,
-transform .25s;
+box-shadow .25s;
 }
