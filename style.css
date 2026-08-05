@@ -266,27 +266,29 @@ pointer-events:none;
 
 .eye{
 position:absolute;
-width:8px;
-height:8px;
+width:20px;
+height:15px;
 border-radius:50%;
-background:rgba(20,4,4,.9);
-box-shadow:0 0 3px rgba(255,60,60,.4);
+background:radial-gradient(circle,#0c0402 55%,rgba(12,4,2,0) 100%);
+opacity:0;
+transform:scaleY(0);
+transform-origin:center;
 animation:blink 4.5s ease-in-out infinite;
 }
 
-.left{ left:31px; top:43px; }
-.right{ right:31px; top:43px; }
+.left{ left:24px; top:38px; }
+.right{ right:24px; top:38px; }
 
 @keyframes blink{
-0%,88%,100%{ transform:scaleY(1); }
-93%{ transform:scaleY(.1); }
-96%{ transform:scaleY(1); }
+0%,88%,100%{ opacity:0; transform:scaleY(0); }
+93%{ opacity:1; transform:scaleY(1); }
+96%{ opacity:0; transform:scaleY(0); }
 }
 
 /* Во время ответа хаски моргает чаще — признак "думает" */
 
 body.thinking .eye{
-animation:blink 1s ease-in-out infinite;
+animation:blink 1.1s ease-in-out infinite;
 }
 
 .header h1{
@@ -436,6 +438,7 @@ flex-shrink:0;
 
 input[type="text"]{
 flex:1;
+min-width:0;
 padding:15px 18px;
 border:none;
 border-radius:16px;
@@ -457,6 +460,9 @@ background:#222;
 width:50px;
 height:50px;
 flex-shrink:0;
+display:flex;
+align-items:center;
+justify-content:center;
 border:none;
 border-radius:14px;
 cursor:pointer;
@@ -484,6 +490,9 @@ button#send{
 width:56px;
 height:50px;
 flex-shrink:0;
+display:flex;
+align-items:center;
+justify-content:center;
 border:none;
 border-radius:16px;
 cursor:pointer;
