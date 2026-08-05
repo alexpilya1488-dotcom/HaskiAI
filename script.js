@@ -49,6 +49,55 @@ function scrollBottom() {
 }
 
 /* ==========================================================
+   Тихие звуки отправки / получения сообщений
+========================================================== */
+
+let audioCtx = null;
+
+function getAudioCtx() {
+  if (!audioCtx) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new Ctx();
+  }
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+  return audioCtx;
+}
+
+function playTone(freqStart, freqEnd, duration, volume) {
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(freqStart, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(freqEnd, ctx.currentTime + duration);
+
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(volume, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + duration + 0.05);
+  } catch (e) {
+    console.warn("Звук недоступен:", e);
+  }
+}
+
+function playSendSound() {
+  playTone(520, 720, 0.14, 0.06);
+}
+
+function playReceiveSound() {
+  playTone(480, 340, 0.22, 0.055);
+}
+
+/* ==========================================================
    Сообщения — импульсный эффект вместо "пузырей"
 ========================================================== */
 
@@ -96,6 +145,7 @@ async function sendMessage() {
   if (!text && !pendingImage) return;
 
   addMessage(text || "🖼️ Изображение", "user", pendingImage);
+  playSendSound();
 
   // Собираем содержимое сообщения: текст + (опционально) картинка
   let userContent;
@@ -147,6 +197,7 @@ async function sendMessage() {
     }
 
     addMessage(result.answer, "ai");
+    playReceiveSound();
 
     history.push({
       role: "assistant",
