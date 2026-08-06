@@ -181,7 +181,13 @@ async function sendMessage() {
     loading.remove();
 
     if (!result.ok) {
-      addMessage("❌ Все нейросети сейчас недоступны. Попробуй чуть позже.", "ai");
+      const failMsg = addMessage(
+        "❌ Все нейросети сейчас недоступны. Попробуй чуть позже — а пока можно сыграть." +
+        "<br><button type='button' class='playGameBtn'>Сыграть, пока ждём</button>",
+        "ai"
+      );
+      const playBtn = failMsg.querySelector(".playGameBtn");
+      if (playBtn) playBtn.addEventListener("click", openGame);
       return;
     }
 
@@ -425,3 +431,636 @@ const loader = setInterval(() => {
   }
 
 }, 80);
+
+/* ==========================================================
+   МИНИ-ИГРА: хаски убегает от мин по дороге
+   (показывается, когда все нейросети недоступны)
+========================================================== */
+
+const gameOverlay = document.getElementById("gameOverlay");
+const gameCanvas = document.getElementById("gameCanvas");
+const gameScoreEl = document.getElementById("gameScore");
+const gameCloseBtn = document.getElementById("gameClose");
+const gameJumpBtn = document.getElementById("gameJumpBtn");
+const gameOverPanel = document.getElementById("gameOverPanel");
+const gameOverScoreEl = document.getElementById("gameOverScore");
+const gameRestartBtn = document.getElementById("gameRestart");
+const gameExitBtn = document.getElementById("gameExit");
+const gameOpenBtn = document.getElementById("gameOpenBtn");
+
+const LEVEL_UP_MINES = 10;
+const GRAVITY = 1500;
+const JUMP_VELOCITY = -560;
+const BEST_SCORE_KEY = "huskyRunnerBest";
+
+function getBestScore() {
+  const v = parseInt(localStorage.getItem(BEST_SCORE_KEY), 10);
+  return isNaN(v) ? 0 : v;
+}
+
+function saveBestScore(score) {
+  if (score > getBestScore()) {
+    localStorage.setItem(BEST_SCORE_KEY, String(score));
+  }
+}
+
+let gctx = null;
+let gameRAF = null;
+let gameActive = false;
+let g = null;
+
+function resizeGameCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = gameCanvas.getBoundingClientRect();
+  gameCanvas.width = Math.round(rect.width * dpr);
+  gameCanvas.height = Math.round(rect.height * dpr);
+  gctx = gameCanvas.getContext("2d");
+  gctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (g) {
+    g.width = rect.width;
+    g.height = rect.height;
+    g.groundY = rect.height * 0.72;
+  }
+}
+
+function initGameState() {
+  const rect = gameCanvas.getBoundingClientRect();
+  const groundY = rect.height * 0.72;
+
+  g = {
+    width: rect.width,
+    height: rect.height,
+    groundY,
+    dog: {
+      x: rect.width * 0.16,
+      y: groundY,
+      vy: 0,
+      w: 50,
+      h: 32,
+      onGround: true,
+      runPhase: 0
+    },
+    obstacles: [],
+    particles: [],
+    shockwave: null,
+    rocket: null,
+    speed: 230,
+    spawnTimer: 0,
+    nextSpawn: 1000,
+    score: 0,
+    level: 1,
+    levelBannerTimer: 0,
+    phase: "running", // running -> levelTransition -> running (endless) | running -> exploding -> over
+    shake: 0,
+    explodeTimer: 0,
+    roadOffset: 0
+  };
+
+  updateScoreUI();
+}
+
+function updateScoreUI() {
+  const score = g ? g.score : 0;
+  gameScoreEl.textContent = "Мин: " + score + "  ·  Рекорд: " + getBestScore();
+}
+
+function jump() {
+  if (!g || (g.phase !== "running" && g.phase !== "levelTransition")) return;
+  if (g.dog.onGround) {
+    g.dog.vy = JUMP_VELOCITY;
+    g.dog.onGround = false;
+  }
+}
+
+function spawnMine() {
+  const size = 32 + Math.random() * 10;
+  g.obstacles.push({
+    x: g.width + size,
+    size,
+    passed: false
+  });
+}
+
+function spawnExplosion(x, y) {
+  for (let i = 0; i < 30; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 90 + Math.random() * 240;
+    g.particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      age: 0,
+      life: 0.45 + Math.random() * 0.35,
+      size: 3 + Math.random() * 5,
+      warm: Math.random() < 0.55
+    });
+  }
+  g.shockwave = { x, y, r: 6, alpha: 1 };
+  g.shake = 16;
+}
+
+function startLevelTransition() {
+  g.phase = "levelTransition";
+  g.levelBannerTimer = 1.6;
+  g.rocket = {
+    x: g.width + 60,
+    y: g.height * 0.16,
+    speed: 520,
+    flameTimer: 0
+  };
+}
+
+function finishLevelTransition() {
+  g.level++;
+  g.rocket = null;
+  g.phase = "running";
+}
+
+function gameOver() {
+  g.phase = "over";
+  saveBestScore(g.score);
+  gameOverScoreEl.textContent = "Пройдено мин: " + g.score + "   Рекорд: " + getBestScore();
+  gameOverPanel.hidden = false;
+  updateScoreUI();
+}
+
+function update(dt) {
+
+  g.roadOffset = (g.roadOffset + g.speed * dt) % 40;
+
+  const alive = g.phase === "running" || g.phase === "levelTransition";
+
+  if (alive) {
+
+    const dog = g.dog;
+
+    if (!dog.onGround) {
+      dog.vy += GRAVITY * dt;
+      dog.y += dog.vy * dt;
+      if (dog.y >= g.groundY) {
+        dog.y = g.groundY;
+        dog.vy = 0;
+        dog.onGround = true;
+      }
+    } else {
+      dog.runPhase += dt * 10;
+    }
+
+    g.spawnTimer += dt * 1000;
+    if (g.spawnTimer >= g.nextSpawn) {
+      spawnMine();
+      g.spawnTimer = 0;
+      g.nextSpawn = 950 + Math.random() * 650;
+    }
+
+    for (const o of g.obstacles) {
+      o.x -= g.speed * dt;
+
+      if (!o.passed && o.x + o.size < dog.x) {
+        o.passed = true;
+        g.score++;
+        updateScoreUI();
+        if (g.score === LEVEL_UP_MINES && g.level === 1) {
+          startLevelTransition();
+        }
+      }
+
+      const dogLow = dog.y >= g.groundY - dog.h * 0.35;
+      const overlapX = dog.x + dog.w * 0.3 < o.x + o.size * 0.55 &&
+                        dog.x + dog.w * 0.7 > o.x - o.size * 0.55;
+
+      if (dogLow && overlapX) {
+        spawnExplosion(dog.x + dog.w * 0.5, g.groundY - dog.h * 0.4);
+        g.phase = "exploding";
+        g.explodeTimer = 0;
+        g.rocket = null;
+        break;
+      }
+    }
+
+    g.obstacles = g.obstacles.filter(o => o.x + o.size > -10);
+    g.speed = 230 + g.score * 9;
+
+    if (g.phase === "levelTransition") {
+      const r = g.rocket;
+      r.x -= r.speed * dt;
+      r.flameTimer += dt;
+
+      if (r.flameTimer > 0.03) {
+        r.flameTimer = 0;
+        g.particles.push({
+          x: r.x + 20, y: r.y,
+          vx: 40 + Math.random() * 40,
+          vy: (Math.random() - 0.5) * 40,
+          age: 0,
+          life: 0.35,
+          size: 3 + Math.random() * 3,
+          warm: true,
+          trail: true
+        });
+      }
+
+      g.levelBannerTimer = Math.max(0, g.levelBannerTimer - dt);
+
+      if (r.x < -60) {
+        finishLevelTransition();
+      }
+    }
+
+  } else if (g.phase === "exploding") {
+    g.explodeTimer += dt;
+    if (g.explodeTimer > 0.85) {
+      gameOver();
+    }
+  }
+
+  // частицы
+  for (const p of g.particles) {
+    p.age += dt;
+    p.vy += (p.trail ? 40 : 320) * dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+  }
+  g.particles = g.particles.filter(p => p.age < p.life);
+
+  if (g.shockwave) {
+    g.shockwave.r += 480 * dt;
+    g.shockwave.alpha -= dt * 1.7;
+    if (g.shockwave.alpha <= 0) g.shockwave = null;
+  }
+
+  if (g.shake > 0) {
+    g.shake = Math.max(0, g.shake - dt * 46);
+  }
+}
+
+/* ===== Отрисовка ===== */
+
+function drawBackground() {
+  gctx.fillStyle = "#050000";
+  gctx.fillRect(0, 0, g.width, g.height);
+
+  const skyGrad = gctx.createLinearGradient(0, 0, 0, g.groundY);
+  skyGrad.addColorStop(0, "#1a0000");
+  skyGrad.addColorStop(1, "#000000");
+  gctx.fillStyle = skyGrad;
+  gctx.fillRect(0, 0, g.width, g.groundY);
+
+  // дорога
+  gctx.fillStyle = "#0e0e0e";
+  gctx.fillRect(0, g.groundY, g.width, g.height - g.groundY);
+
+  gctx.strokeStyle = "rgba(255,40,40,.35)";
+  gctx.lineWidth = 2;
+  gctx.beginPath();
+  gctx.moveTo(0, g.groundY);
+  gctx.lineTo(g.width, g.groundY);
+  gctx.stroke();
+
+  // разметка
+  gctx.strokeStyle = "rgba(255,255,255,.18)";
+  gctx.lineWidth = 3;
+  const dashY = g.groundY + (g.height - g.groundY) * 0.5;
+  gctx.beginPath();
+  for (let x = -40 + g.roadOffset; x < g.width; x += 40) {
+    gctx.moveTo(x, dashY);
+    gctx.lineTo(x + 20, dashY);
+  }
+  gctx.stroke();
+}
+
+function drawDog(dog) {
+  const airborne = !dog.onGround;
+  const legSwing = Math.sin(dog.runPhase) * (airborne ? 0 : 1);
+
+  gctx.save();
+  gctx.translate(dog.x, dog.y);
+
+  // тень
+  const shadowScale = airborne ? Math.max(0.4, 1 - (g.groundY - dog.y) / 120) : 1;
+  gctx.fillStyle = "rgba(0,0,0,.45)";
+  gctx.beginPath();
+  gctx.ellipse(dog.w * 0.15, 4, dog.w * 0.42 * shadowScale, 5 * shadowScale, 0, 0, Math.PI * 2);
+  gctx.fill();
+
+  gctx.translate(0, -dog.h * 0.5);
+
+  // задние лапы
+  gctx.strokeStyle = "#111";
+  gctx.lineWidth = 6;
+  gctx.lineCap = "round";
+  gctx.beginPath();
+  gctx.moveTo(-dog.w * 0.28, dog.h * 0.35);
+  gctx.lineTo(-dog.w * 0.28 + legSwing * 7, dog.h * 0.7);
+  gctx.stroke();
+
+  gctx.beginPath();
+  gctx.moveTo(dog.w * 0.22, dog.h * 0.35);
+  gctx.lineTo(dog.w * 0.22 - legSwing * 7, dog.h * 0.7);
+  gctx.stroke();
+
+  // хвост
+  gctx.strokeStyle = "#161616";
+  gctx.lineWidth = 7;
+  gctx.beginPath();
+  gctx.moveTo(-dog.w * 0.42, dog.h * 0.05);
+  gctx.quadraticCurveTo(-dog.w * 0.66, -dog.h * 0.35, -dog.w * 0.5, -dog.h * 0.55);
+  gctx.stroke();
+
+  // корпус
+  const bodyGrad = gctx.createLinearGradient(-dog.w * 0.4, 0, dog.w * 0.4, 0);
+  bodyGrad.addColorStop(0, "#232323");
+  bodyGrad.addColorStop(1, "#0c0c0c");
+  gctx.fillStyle = bodyGrad;
+  gctx.beginPath();
+  gctx.ellipse(0, 0, dog.w * 0.42, dog.h * 0.42, 0, 0, Math.PI * 2);
+  gctx.fill();
+
+  // передние лапы (поверх корпуса)
+  gctx.strokeStyle = "#111";
+  gctx.lineWidth = 6;
+  gctx.beginPath();
+  gctx.moveTo(dog.w * 0.3, dog.h * 0.3);
+  gctx.lineTo(dog.w * 0.3 + legSwing * 7, dog.h * 0.68);
+  gctx.stroke();
+
+  gctx.beginPath();
+  gctx.moveTo(-dog.w * 0.05, dog.h * 0.3);
+  gctx.lineTo(-dog.w * 0.05 - legSwing * 7, dog.h * 0.68);
+  gctx.stroke();
+
+  // голова
+  gctx.save();
+  gctx.translate(dog.w * 0.4, -dog.h * 0.18);
+
+  gctx.fillStyle = "#1c1c1c";
+  gctx.beginPath();
+  gctx.ellipse(0, 0, dog.w * 0.22, dog.h * 0.3, 0, 0, Math.PI * 2);
+  gctx.fill();
+
+  // ухо
+  gctx.fillStyle = "#0c0c0c";
+  gctx.beginPath();
+  gctx.moveTo(-dog.w * 0.05, -dog.h * 0.28);
+  gctx.lineTo(dog.w * 0.02, -dog.h * 0.55);
+  gctx.lineTo(dog.w * 0.1, -dog.h * 0.24);
+  gctx.closePath();
+  gctx.fill();
+
+  // морда
+  gctx.fillStyle = "#1c1c1c";
+  gctx.beginPath();
+  gctx.ellipse(dog.w * 0.2, dog.h * 0.06, dog.w * 0.12, dog.h * 0.13, 0, 0, Math.PI * 2);
+  gctx.fill();
+
+  // нос
+  gctx.fillStyle = "#000";
+  gctx.beginPath();
+  gctx.arc(dog.w * 0.3, dog.h * 0.08, 2.6, 0, Math.PI * 2);
+  gctx.fill();
+
+  // светящийся глаз
+  gctx.fillStyle = "#ff2020";
+  gctx.shadowColor = "#ff0000";
+  gctx.shadowBlur = 8;
+  gctx.beginPath();
+  gctx.arc(dog.w * 0.07, -dog.h * 0.02, 2.4, 0, Math.PI * 2);
+  gctx.fill();
+  gctx.shadowBlur = 0;
+
+  gctx.restore();
+  gctx.restore();
+}
+
+function drawMine(o) {
+  const x = o.x;
+  const y = g.groundY - o.size * 0.5;
+
+  gctx.save();
+  gctx.translate(x, y);
+
+  // шипы
+  const spikeCount = 8;
+  gctx.fillStyle = "#181818";
+  for (let i = 0; i < spikeCount; i++) {
+    const angle = (i / spikeCount) * Math.PI * 2;
+    const bx = Math.cos(angle) * o.size * 0.5;
+    const by = Math.sin(angle) * o.size * 0.5;
+    const tx = Math.cos(angle) * o.size * 0.78;
+    const ty = Math.sin(angle) * o.size * 0.78;
+    const perpX = Math.cos(angle + Math.PI / 2) * o.size * 0.06;
+    const perpY = Math.sin(angle + Math.PI / 2) * o.size * 0.06;
+
+    gctx.beginPath();
+    gctx.moveTo(bx + perpX, by + perpY);
+    gctx.lineTo(tx, ty);
+    gctx.lineTo(bx - perpX, by - perpY);
+    gctx.closePath();
+    gctx.fill();
+  }
+
+  // корпус мины
+  const grad = gctx.createRadialGradient(
+    -o.size * 0.18, -o.size * 0.18, o.size * 0.05,
+    0, 0, o.size * 0.52
+  );
+  grad.addColorStop(0, "#4a4a4a");
+  grad.addColorStop(1, "#0a0a0a");
+  gctx.fillStyle = grad;
+  gctx.beginPath();
+  gctx.arc(0, 0, o.size * 0.5, 0, Math.PI * 2);
+  gctx.fill();
+  gctx.strokeStyle = "#000";
+  gctx.lineWidth = 2;
+  gctx.stroke();
+
+  // клёпки
+  gctx.fillStyle = "#050505";
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    gctx.beginPath();
+    gctx.arc(Math.cos(a) * o.size * 0.28, Math.sin(a) * o.size * 0.28, 1.6, 0, Math.PI * 2);
+    gctx.fill();
+  }
+
+  // мигающий индикатор
+  const blink = Math.sin(performance.now() / 140) > 0;
+  gctx.beginPath();
+  gctx.arc(0, -o.size * 0.05, o.size * 0.09, 0, Math.PI * 2);
+  gctx.fillStyle = blink ? "#ff3030" : "#701010";
+  if (blink) {
+    gctx.shadowColor = "#ff0000";
+    gctx.shadowBlur = 10;
+  }
+  gctx.fill();
+  gctx.shadowBlur = 0;
+
+  gctx.restore();
+}
+
+function drawRocket(r) {
+  gctx.save();
+  gctx.translate(r.x, r.y);
+
+  // пламя
+  const flameGrad = gctx.createLinearGradient(6, 0, 42, 0);
+  flameGrad.addColorStop(0, "rgba(255,210,80,.95)");
+  flameGrad.addColorStop(1, "rgba(255,50,0,0)");
+  gctx.fillStyle = flameGrad;
+  gctx.beginPath();
+  gctx.moveTo(8, -6);
+  gctx.lineTo(40, 0);
+  gctx.lineTo(8, 6);
+  gctx.closePath();
+  gctx.fill();
+
+  // корпус
+  gctx.fillStyle = "#8f8f8f";
+  gctx.beginPath();
+  gctx.moveTo(-22, -6);
+  gctx.lineTo(6, -6);
+  gctx.lineTo(14, 0);
+  gctx.lineTo(6, 6);
+  gctx.lineTo(-22, 6);
+  gctx.closePath();
+  gctx.fill();
+  gctx.strokeStyle = "#2a2a2a";
+  gctx.lineWidth = 1.5;
+  gctx.stroke();
+
+  // боевая часть
+  gctx.fillStyle = "#c81414";
+  gctx.beginPath();
+  gctx.moveTo(6, -6);
+  gctx.lineTo(14, 0);
+  gctx.lineTo(6, 6);
+  gctx.closePath();
+  gctx.fill();
+
+  // стабилизаторы
+  gctx.fillStyle = "#4a4a4a";
+  gctx.beginPath();
+  gctx.moveTo(-22, -6); gctx.lineTo(-30, -14); gctx.lineTo(-16, -6); gctx.closePath(); gctx.fill();
+  gctx.beginPath();
+  gctx.moveTo(-22, 6); gctx.lineTo(-30, 14); gctx.lineTo(-16, 6); gctx.closePath(); gctx.fill();
+
+  gctx.restore();
+}
+
+function drawParticles() {
+  for (const p of g.particles) {
+    const alpha = Math.max(0, 1 - p.age / p.life);
+    gctx.beginPath();
+    gctx.fillStyle = p.warm
+      ? `rgba(255,${p.trail ? 170 : 120},${p.trail ? 40 : 20},${alpha})`
+      : `rgba(120,120,120,${alpha * 0.7})`;
+    gctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    gctx.fill();
+  }
+
+  if (g.shockwave) {
+    gctx.beginPath();
+    gctx.strokeStyle = `rgba(255,120,30,${Math.max(0, g.shockwave.alpha)})`;
+    gctx.lineWidth = 4;
+    gctx.arc(g.shockwave.x, g.shockwave.y, g.shockwave.r, 0, Math.PI * 2);
+    gctx.stroke();
+  }
+}
+
+function drawLevelBanner() {
+  if (!g.levelBannerTimer || g.levelBannerTimer <= 0) return;
+  const alpha = Math.min(1, g.levelBannerTimer / 0.4, (1.6 - g.levelBannerTimer) / 0.3);
+  gctx.save();
+  gctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+  gctx.textAlign = "center";
+  gctx.font = "800 26px -apple-system, Segoe UI, Roboto, Arial, sans-serif";
+  gctx.fillStyle = "#ff1414";
+  gctx.shadowColor = "#ff0000";
+  gctx.shadowBlur = 18;
+  gctx.fillText("УРОВЕНЬ " + (g.level + 1), g.width / 2, g.height * 0.22);
+  gctx.restore();
+}
+
+function render() {
+  gctx.clearRect(0, 0, g.width, g.height);
+
+  gctx.save();
+
+  if (g.shake > 0) {
+    const dx = (Math.random() - 0.5) * g.shake;
+    const dy = (Math.random() - 0.5) * g.shake;
+    gctx.translate(dx, dy);
+  }
+
+  drawBackground();
+
+  for (const o of g.obstacles) drawMine(o);
+
+  if (g.phase === "running" || g.phase === "levelTransition") {
+    drawDog(g.dog);
+  }
+
+  if (g.phase === "levelTransition" && g.rocket) {
+    drawRocket(g.rocket);
+    drawLevelBanner();
+  }
+
+  drawParticles();
+
+  gctx.restore();
+}
+
+function gameStep(now) {
+  if (!gameActive || !g) return;
+  const dt = Math.min((now - (g.lastTime || now)) / 1000, 0.05);
+  g.lastTime = now;
+
+  update(dt);
+  render();
+
+  gameRAF = requestAnimationFrame(gameStep);
+}
+
+function openGame() {
+  gameOverlay.hidden = false;
+  gameOverPanel.hidden = true;
+  resizeGameCanvas();
+  initGameState();
+  g.lastTime = performance.now();
+  gameActive = true;
+  gameRAF = requestAnimationFrame(gameStep);
+}
+
+function closeGame() {
+  gameActive = false;
+  if (gameRAF) cancelAnimationFrame(gameRAF);
+  gameOverlay.hidden = true;
+}
+
+function restartGame() {
+  gameOverPanel.hidden = true;
+  resizeGameCanvas();
+  initGameState();
+  g.lastTime = performance.now();
+  gameActive = true;
+  gameRAF = requestAnimationFrame(gameStep);
+}
+
+gameCloseBtn.addEventListener("click", closeGame);
+gameExitBtn.addEventListener("click", closeGame);
+gameRestartBtn.addEventListener("click", restartGame);
+gameOpenBtn.addEventListener("click", openGame);
+
+gameJumpBtn.addEventListener("click", jump);
+gameCanvas.addEventListener("pointerdown", jump);
+
+window.addEventListener("keydown", (e) => {
+  if (!gameOverlay.hidden && (e.code === "Space" || e.code === "ArrowUp")) {
+    e.preventDefault();
+    jump();
+  }
+});
+
+window.addEventListener("resize", () => {
+  if (!gameOverlay.hidden) resizeGameCanvas();
+});
