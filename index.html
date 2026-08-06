@@ -40,6 +40,16 @@
 
     <header class="header">
 
+        <button id="gameOpenBtn" class="headerGameBtn" title="Мини-игра">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                <circle cx="7" cy="7" r="2.1"/>
+                <circle cx="12.3" cy="4.8" r="2.1"/>
+                <circle cx="17.2" cy="7" r="2.1"/>
+                <circle cx="19" cy="12" r="2.1"/>
+                <path d="M12 10.2c2.6 0 5 2 5 4.6 0 2.1-1.6 3.4-3.4 3.1-.9-.15-1.1-.7-1.6-.7s-.7.55-1.6.7c-1.8.3-3.4-1-3.4-3.1 0-2.6 2.4-4.6 5-4.6z"/>
+            </svg>
+        </button>
+
         <div class="logoBox" id="logoBox">
 
             <div class="glow"></div>
@@ -49,6 +59,11 @@
             class="logo"
             id="logo"
             alt="Husky AI">
+
+            <div class="eyes">
+                <div class="eye left"></div>
+                <div class="eye right"></div>
+            </div>
 
         </div>
 
@@ -114,6 +129,26 @@
         </button>
 
     </footer>
+
+</div>
+
+<div id="gameOverlay" class="gameOverlay" hidden>
+
+    <div class="gameTopBar">
+        <span id="gameScore" class="gameScore">Пройдено мин: 0</span>
+        <button id="gameClose" class="gameClose" title="Закрыть">✕</button>
+    </div>
+
+    <canvas id="gameCanvas" class="gameCanvas"></canvas>
+
+    <button id="gameJumpBtn" class="gameJumpBtn">ПРЫЖОК</button>
+
+    <div id="gameOverPanel" class="gameOverPanel" hidden>
+        <div class="gameOverTitle">GAME OVER</div>
+        <p id="gameOverScore" class="gameOverScore"></p>
+        <button id="gameRestart" class="gameRestart">Играть снова</button>
+        <button id="gameExit" class="gameExit">Выйти</button>
+    </div>
 
 </div>
 
