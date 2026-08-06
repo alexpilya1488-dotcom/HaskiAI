@@ -452,6 +452,7 @@ const LEVEL_UP_MINES = 10;
 const GRAVITY = 1500;
 const JUMP_VELOCITY = -560;
 const BEST_SCORE_KEY = "huskyRunnerBest";
+const LEVEL2_KEY = "huskyRunnerLevel2";
 
 function getBestScore() {
   const v = parseInt(localStorage.getItem(BEST_SCORE_KEY), 10);
@@ -462,6 +463,14 @@ function saveBestScore(score) {
   if (score > getBestScore()) {
     localStorage.setItem(BEST_SCORE_KEY, String(score));
   }
+}
+
+function isLevel2Unlocked() {
+  return localStorage.getItem(LEVEL2_KEY) === "1";
+}
+
+function unlockLevel2() {
+  localStorage.setItem(LEVEL2_KEY, "1");
 }
 
 let gctx = null;
@@ -486,6 +495,7 @@ function resizeGameCanvas() {
 function initGameState() {
   const rect = gameCanvas.getBoundingClientRect();
   const groundY = rect.height * 0.72;
+  const startLevel = isLevel2Unlocked() ? 2 : 1;
 
   g = {
     width: rect.width,
@@ -508,9 +518,9 @@ function initGameState() {
     spawnTimer: 0,
     nextSpawn: 1000,
     score: 0,
-    level: 1,
-    levelBannerTimer: 0,
-    phase: "running", // running -> levelTransition -> running (endless) | running -> exploding -> over
+    level: startLevel,
+    levelBannerTimer: startLevel === 2 ? 1.6 : 0,
+    phase: "running", // running -> rocketIncoming -> exploding -> over
     shake: 0,
     explodeTimer: 0,
     roadOffset: 0
@@ -525,7 +535,7 @@ function updateScoreUI() {
 }
 
 function jump() {
-  if (!g || (g.phase !== "running" && g.phase !== "levelTransition")) return;
+  if (!g || g.phase !== "running") return;
   if (g.dog.onGround) {
     g.dog.vy = JUMP_VELOCITY;
     g.dog.onGround = false;
@@ -559,21 +569,14 @@ function spawnExplosion(x, y) {
   g.shake = 16;
 }
 
-function startLevelTransition() {
-  g.phase = "levelTransition";
-  g.levelBannerTimer = 1.6;
+function startRocketSequence() {
+  g.phase = "rocketIncoming";
   g.rocket = {
     x: g.width + 60,
-    y: g.height * 0.16,
-    speed: 520,
+    y: g.dog.y - g.dog.h * 0.55,
+    speed: 620,
     flameTimer: 0
   };
-}
-
-function finishLevelTransition() {
-  g.level++;
-  g.rocket = null;
-  g.phase = "running";
 }
 
 function gameOver() {
@@ -588,9 +591,9 @@ function update(dt) {
 
   g.roadOffset = (g.roadOffset + g.speed * dt) % 40;
 
-  const alive = g.phase === "running" || g.phase === "levelTransition";
+  g.levelBannerTimer = Math.max(0, (g.levelBannerTimer || 0) - dt);
 
-  if (alive) {
+  if (g.phase === "running") {
 
     const dog = g.dog;
 
@@ -621,7 +624,7 @@ function update(dt) {
         g.score++;
         updateScoreUI();
         if (g.score === LEVEL_UP_MINES && g.level === 1) {
-          startLevelTransition();
+          startRocketSequence();
         }
       }
 
@@ -629,11 +632,10 @@ function update(dt) {
       const overlapX = dog.x + dog.w * 0.3 < o.x + o.size * 0.55 &&
                         dog.x + dog.w * 0.7 > o.x - o.size * 0.55;
 
-      if (dogLow && overlapX) {
+      if (dogLow && overlapX && g.phase === "running") {
         spawnExplosion(dog.x + dog.w * 0.5, g.groundY - dog.h * 0.4);
         g.phase = "exploding";
         g.explodeTimer = 0;
-        g.rocket = null;
         break;
       }
     }
@@ -641,30 +643,32 @@ function update(dt) {
     g.obstacles = g.obstacles.filter(o => o.x + o.size > -10);
     g.speed = 230 + g.score * 9;
 
-    if (g.phase === "levelTransition") {
-      const r = g.rocket;
-      r.x -= r.speed * dt;
-      r.flameTimer += dt;
+  } else if (g.phase === "rocketIncoming") {
 
-      if (r.flameTimer > 0.03) {
-        r.flameTimer = 0;
-        g.particles.push({
-          x: r.x + 20, y: r.y,
-          vx: 40 + Math.random() * 40,
-          vy: (Math.random() - 0.5) * 40,
-          age: 0,
-          life: 0.35,
-          size: 3 + Math.random() * 3,
-          warm: true,
-          trail: true
-        });
-      }
+    const r = g.rocket;
+    r.x -= r.speed * dt;
+    r.flameTimer += dt;
 
-      g.levelBannerTimer = Math.max(0, g.levelBannerTimer - dt);
+    if (r.flameTimer > 0.03) {
+      r.flameTimer = 0;
+      g.particles.push({
+        x: r.x + 20, y: r.y,
+        vx: 40 + Math.random() * 40,
+        vy: (Math.random() - 0.5) * 40,
+        age: 0,
+        life: 0.35,
+        size: 3 + Math.random() * 3,
+        warm: true,
+        trail: true
+      });
+    }
 
-      if (r.x < -60) {
-        finishLevelTransition();
-      }
+    if (r.x <= g.dog.x + g.dog.w * 0.4) {
+      spawnExplosion(g.dog.x + g.dog.w * 0.5, g.dog.y - g.dog.h * 0.4);
+      g.rocket = null;
+      g.phase = "exploding";
+      g.explodeTimer = 0;
+      unlockLevel2();
     }
 
   } else if (g.phase === "exploding") {
@@ -977,7 +981,7 @@ function drawLevelBanner() {
   gctx.fillStyle = "#ff1414";
   gctx.shadowColor = "#ff0000";
   gctx.shadowBlur = 18;
-  gctx.fillText("УРОВЕНЬ " + (g.level + 1), g.width / 2, g.height * 0.22);
+  gctx.fillText("УРОВЕНЬ " + g.level, g.width / 2, g.height * 0.22);
   gctx.restore();
 }
 
@@ -996,15 +1000,15 @@ function render() {
 
   for (const o of g.obstacles) drawMine(o);
 
-  if (g.phase === "running" || g.phase === "levelTransition") {
+  if (g.phase === "running" || g.phase === "rocketIncoming") {
     drawDog(g.dog);
   }
 
-  if (g.phase === "levelTransition" && g.rocket) {
+  if (g.phase === "rocketIncoming" && g.rocket) {
     drawRocket(g.rocket);
-    drawLevelBanner();
   }
 
+  drawLevelBanner();
   drawParticles();
 
   gctx.restore();
