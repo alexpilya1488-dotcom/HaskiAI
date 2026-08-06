@@ -184,12 +184,40 @@ border-right:1px solid rgba(255,0,0,.12);
 }
 
 .header{
+position:relative;
 padding:16px;
 text-align:center;
 background:linear-gradient(180deg,#250000,#120000);
 border-bottom:1px solid rgba(255,0,0,.18);
 perspective:600px;
 }
+
+.headerGameBtn{
+position:absolute;
+top:14px;
+right:14px;
+width:34px;
+height:34px;
+display:flex;
+align-items:center;
+justify-content:center;
+border:none;
+border-radius:50%;
+background:rgba(255,0,0,.08);
+color:#ff8a8a;
+cursor:pointer;
+box-shadow:0 0 8px rgba(255,0,0,.15);
+transition:.25s;
+z-index:5;
+}
+
+.headerGameBtn:hover{
+color:#fff;
+box-shadow:0 0 16px rgba(255,0,0,.4);
+transform:scale(1.08);
+}
+
+.headerGameBtn:active{ transform:scale(.94); }
 
 /* ===== Логотип ===== */
 
@@ -578,3 +606,158 @@ color .25s,
 border-color .25s,
 box-shadow .25s;
 }
+
+/* =========================
+   МИНИ-ИГРА
+========================= */
+
+.gameOverlay{
+position:fixed;
+inset:0;
+z-index:100000;
+display:flex;
+flex-direction:column;
+background:
+radial-gradient(circle at 50% 20%,#2a0000 0%,#0a0000 45%,#000 100%);
+padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+}
+
+.gameOverlay[hidden]{ display:none; }
+
+.gameTopBar{
+display:flex;
+align-items:center;
+justify-content:space-between;
+padding:14px 18px;
+border-bottom:1px solid rgba(255,0,0,.2);
+}
+
+.gameScore{
+font-size:15px;
+font-weight:700;
+letter-spacing:1px;
+color:#ff9a9a;
+text-shadow:0 0 10px rgba(255,0,0,.5);
+}
+
+.gameClose{
+width:34px;
+height:34px;
+border:none;
+border-radius:50%;
+background:#1b1b1b;
+color:#ff6666;
+font-size:15px;
+cursor:pointer;
+box-shadow:0 0 10px rgba(255,0,0,.25);
+}
+
+.gameCanvas{
+flex:1;
+width:100%;
+display:block;
+touch-action:manipulation;
+}
+
+.gameJumpBtn{
+margin:14px auto calc(18px + env(safe-area-inset-bottom));
+width:min(86%,420px);
+padding:16px;
+border:none;
+border-radius:16px;
+font-size:16px;
+font-weight:800;
+letter-spacing:2px;
+color:#fff;
+background:linear-gradient(180deg,#ff2b2b,#7a0000);
+box-shadow:0 0 22px rgba(255,0,0,.4);
+cursor:pointer;
+}
+
+.gameJumpBtn:active{ transform:scale(.97); }
+
+.gameOverPanel{
+position:absolute;
+inset:0;
+display:flex;
+flex-direction:column;
+align-items:center;
+justify-content:center;
+gap:14px;
+background:rgba(0,0,0,.72);
+backdrop-filter:blur(4px);
+animation:gameOverFade .4s ease;
+}
+
+.gameOverPanel[hidden]{ display:none; }
+
+@keyframes gameOverFade{
+0%{ opacity:0; }
+100%{ opacity:1; }
+}
+
+.gameOverTitle{
+font-size:52px;
+font-weight:900;
+letter-spacing:4px;
+color:#ff1414;
+text-shadow:
+0 0 14px #ff0000,
+0 0 34px #ff0000,
+0 0 70px rgba(255,0,0,.8),
+0 4px 0 #000;
+-webkit-text-stroke:2px #000;
+animation:gameOverPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes gameOverPulse{
+0%,100%{ transform:scale(1); }
+50%{ transform:scale(1.05); }
+}
+
+.gameOverScore{
+font-size:16px;
+color:#ffb3b3;
+letter-spacing:1px;
+}
+
+.gameRestart, .gameExit{
+padding:13px 30px;
+border:none;
+border-radius:14px;
+font-size:15px;
+font-weight:700;
+letter-spacing:1px;
+cursor:pointer;
+}
+
+.gameRestart{
+color:#fff;
+background:linear-gradient(180deg,#ff2b2b,#7a0000);
+box-shadow:0 0 20px rgba(255,0,0,.4);
+}
+
+.gameExit{
+color:#ff9a9a;
+background:transparent;
+border:1px solid rgba(255,80,80,.4);
+}
+
+/* Кнопка приглашения сыграть в чате */
+
+.playGameBtn{
+margin-top:10px;
+padding:11px 18px;
+border:none;
+border-radius:12px;
+font-size:14px;
+font-weight:700;
+letter-spacing:.5px;
+color:#fff;
+background:linear-gradient(180deg,#ff2b2b,#7a0000);
+box-shadow:0 0 16px rgba(255,0,0,.35);
+cursor:pointer;
+}
+
+.playGameBtn:active{ transform:scale(.96); }
+
